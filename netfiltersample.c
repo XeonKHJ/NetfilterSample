@@ -10,6 +10,7 @@
 #include <linux/ip.h>  
 #include <linux/tcp.h>  
 #include <linux/udp.h>  
+
 MODULE_LICENSE("GPL"); 
 MODULE_AUTHOR("XuShuzhan");
 MODULE_DESCRIPTION("A NetFilter Demo");
@@ -20,6 +21,9 @@ MODULE_VERSION("1.0");
   ((unsigned char *)&addr)[1],  \
   ((unsigned char *)&addr)[2],  \
   ((unsigned char *)&addr)[3]  
+
+struct net net1;
+struct net net2;
 
 static unsigned int filter_GET_POST(void *p, struct sk_buff *skb, const struct nf_hook_state *s)
 {  
@@ -54,10 +58,10 @@ static unsigned int filter_GET_POST(void *p, struct sk_buff *skb, const struct n
    }
   }  
    return NF_ACCEPT;  
-}  
+}
+
  //regist a hook function 
  struct nf_hook_ops filter_GET_POST_ops = {  
-   .list =  {NULL,NULL},  
    .hook = filter_GET_POST,  //hooked function
    .pf = NFPROTO_IPV4,  
    .hooknum = NF_INET_LOCAL_OUT, 
@@ -65,13 +69,16 @@ static unsigned int filter_GET_POST(void *p, struct sk_buff *skb, const struct n
  };  
 
 static int __init filter_GET_POST_init(void) {  
-  nf_register_hook(&filter_GET_POST_ops);  
+  printk("ShadowDriver kernel module loaded.\n");
+  nf_register_net_hook(&net1, &filter_GET_POST_ops);  
   return 0;  
 }  
 
 
 static void __exit filter_GET_POST_exit(void) {  
-  nf_unregister_hook(&filter_GET_POST_ops);  
+  printk("ShadowDriver kernel module unloaded.\n");
+  nf_unregister_net_hook(&net2, &filter_GET_POST_ops);  
 }   
+
 module_init(filter_GET_POST_init);  
 module_exit(filter_GET_POST_exit);   
