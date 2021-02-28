@@ -19,6 +19,59 @@ MODULE_VERSION("1.0");
  ((unsigned char *)&addr)[2], \
  ((unsigned char *)&addr)[3]
 
+/// <summary>
+/// 计算TCP/IP校验和
+/// </summary>
+/// <param name="bytes">要计算校验和的缓冲区指针，记得把校验和所在的位置置零再传进来。</param>
+/// <param name="byteCounts">缓冲区大小（字节）</param>
+/// <returns>校验和</returns>
+unsigned short CalculateCheckSum(char* bytes, char* fakeHeader, int byteCounts, int fakeHeaderCounts, int marginBytes)
+{
+	unsigned int sum = 0;
+	int paddings = byteCounts % marginBytes;
+
+	int i = 0;
+	for (i = 0; i < fakeHeaderCounts; i += 2)
+	{
+		unsigned int perSum = (unsigned int)(fakeHeader[i + 1] & 0xff) + (((unsigned int)((fakeHeader[i])) << 8) & 0xff00);
+		sum += perSum;
+	}
+
+	for (i = 0; i < (byteCounts + paddings); i += 2)
+	{
+		unsigned int perSum = 0;
+
+		if (i < byteCounts)
+		{
+			perSum += (((unsigned int)((bytes[i])) << 8) & 0xff00);
+		}
+		else
+		{
+			perSum += 0;
+		}
+
+		if (i + 1 < byteCounts)
+		{
+			perSum += (unsigned int)(bytes[i + 1] & 0xff);
+		}
+		else
+		{
+			perSum += 0;
+		}
+
+		sum += perSum;
+	}
+
+	while (sum > 0xffff)
+	{
+		unsigned int exceedPart = (sum & (~0xFFFF)) >> 16;
+		unsigned int remainPart = sum & 0xffff;
+		sum = remainPart + exceedPart;
+	}
+
+	return ~(sum & 0xFFFF);
+}
+
 static unsigned int HookFunc(void *priv, struct sk_buff *skb, const struct nf_hook_state *state)
 {
     __be32 srcIp, dstIp;
@@ -30,20 +83,24 @@ static unsigned int HookFunc(void *priv, struct sk_buff *skb, const struct nf_ho
     {
         //获取IP数据包头部
         struct iphdr * ipHeader = ip_hdr(sucketBuffer);
-
+        
         srcIp = ipHeader->saddr;
         dstIp = ipHeader->daddr;
+        short checksum = ipHeader->check;
         unsigned char destIp[4] = {192, 168, 137, 1};
+        unsigned char newIp[4] = {192, 168, 133, 1};
         unsigned char localhostIp[4] = {127, 0, 0, 1};
         if((srcIp != *((__be32 *)localhostIp)) || dstIp != *((__be32 *)localhostIp))
         {
-            printk("Packet from: %d.%d.%d.%d to %d.%d.%d.%d\n", NIPQUAD(srcIp), NIPQUAD(dstIp));
-            printk("Dec packet addr: %d, %d", srcIp, dstIp);
-
-
-            if(srcIp == *((__be32 *)destIp))
+            //printk("Packet from: %d.%d.%d.%d to %d.%d.%d.%d\n", NIPQUAD(srcIp), NIPQUAD(dstIp));
+            //printk("Dec packet addr: %d, %d", srcIp, dstIp);
+            if(dstIp == *((__be32 *)destIp))
             {
+                unsigned char * ipHeaderBuffer = (unsigned char*) ipHeader;
                 printk("Start modifying packet");
+                printk("%d, %d, %d, %d", NIPQUAD(*ipHeaderBuffer));
+                ipHeader->saddr = *((__be32 *)newIp);
+                ipHeader->check = CalculateCheckSum((char *)ipHeader, NULL, 20, 0, 2);
             }
             
         }
@@ -61,7 +118,7 @@ struct nf_hook_ops filter_ops =
 	/* User fills in from here down. */
 	.hook = HookFunc,
 	.pf = PF_INET,
-	.hooknum = NF_INET_PRE_ROUTING, //hook point. (filtering layer)
+	.hooknum = NF_INET_POST_ROUTING, //hook point. (filtering layer)
 	/* Hooks are ordered in ascending priority. */
 	.priority = NF_IP_PRI_FILTER
 };

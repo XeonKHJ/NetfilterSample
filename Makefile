@@ -12,4 +12,4 @@ kernel_modules:
 	make -C /lib/modules/$(KERNEL_VER)/build M=$(shell pwd) modules
 
 clean:
-	make -C /lib/modules/$(KERNEL_VER)/build M=$(shell pwd) modules
+	make -C /lib/modules/$(KERNEL_VER)/build M=$(shell pwd) clean
