@@ -92,15 +92,21 @@ static unsigned int HookFunc(void *priv, struct sk_buff *skb, const struct nf_ho
         unsigned char localhostIp[4] = {127, 0, 0, 1};
         if((srcIp != *((__be32 *)localhostIp)) || dstIp != *((__be32 *)localhostIp))
         {
-            //printk("Packet from: %d.%d.%d.%d to %d.%d.%d.%d\n", NIPQUAD(srcIp), NIPQUAD(dstIp));
+            printk("Packet from: %d.%d.%d.%d to %d.%d.%d.%d\n", NIPQUAD(srcIp), NIPQUAD(dstIp));
             //printk("Dec packet addr: %d, %d", srcIp, dstIp);
             if(dstIp == *((__be32 *)destIp))
             {
                 unsigned char * ipHeaderBuffer = (unsigned char*) ipHeader;
                 printk("Start modifying packet");
-                printk("%d, %d, %d, %d", NIPQUAD(*ipHeaderBuffer));
+                //printk("%d, %d, %d, %d", NIPQUAD(*ipHeaderBuffer));
                 ipHeader->saddr = *((__be32 *)newIp);
-                ipHeader->check = CalculateCheckSum((char *)ipHeader, NULL, 20, 0, 2);
+                ipHeader->check = 0;
+                short newCheckSum = CalculateCheckSum((char *)ipHeader, NULL, 20, 0, 2);
+                char newCorrectCheckSum[2];
+                newCorrectCheckSum[0] = ((char*)(&newCheckSum))[1];
+                newCorrectCheckSum[1] = ((char*)(&newCheckSum))[0];
+                ipHeader->check = *((short *)newCorrectCheckSum);
+                
             }
             
         }
